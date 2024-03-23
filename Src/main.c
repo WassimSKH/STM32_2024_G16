@@ -6,7 +6,7 @@
   ******************************************************************************
   * @attention
   *
-  * Copyright (c) 2024 STMicroelectronics.
+  * Copyright (c) 2022 STMicroelectronics.
   * All rights reserved.
   *
   * This software is licensed under terms that can be found in the LICENSE file
@@ -19,24 +19,25 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "i2c.h"
-#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "lib_lcd.h"
+#include <string.h>
+#include <stdint.h>
 #include <stdio.h>
+#include "lib.h"
+#include "BMP280_STM32.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-static rgb_lcd lcddata;
+static rgb_lcd lcdData;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -47,6 +48,11 @@ static rgb_lcd lcddata;
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+static const uint8_t BMP_ADDR = 0x77<<1; // Use 8-bit address --> 0x76<<1 = 0xEC
+uint8_t CAPTEUR_CMD_MSB_press= 0xF7;
+uint8_t CAPTEUR_CMD_LSB_press = 0xF8;
+uint8_t CAPTEUR_CMD_MSB_te= 0xFA;
+uint8_t CAPTEUR_CMD_LSB_te = 0xFB;
 
 /* USER CODE END PV */
 
@@ -58,89 +64,7 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint8_t Humidite_octet_1 , Humidite_octet_2 , Temperature_octet_1 , Temperature_octet_2;
-uint16_t somme , Temperature , Humidite;
-uint8_t Reception=0;
-float Temp=0.0;
-float Humi=0.0;
-void delay_us (uint16_t us)
-{
-	__HAL_TIM_SET_COUNTER(&htim6,0);  // initialiser le timer a 0
-	while (__HAL_TIM_GET_COUNTER(&htim6)<us);  // attendre que le compteur atteint la valeur desiré mit en parametre
-}
-void GPIO_INIT_OUTPUT(void){
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET);
-	GPIO_InitStruct.Pin = GPIO_PIN_3;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_PULLUP;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-}
-void GPIO_INIT_INPUT(void){
-		GPIO_InitTypeDef GPIO_InitStruct = {0};
-		GPIO_InitStruct.Pin = GPIO_PIN_3;
-		GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-		GPIO_InitStruct.Pull = GPIO_PULLUP;
-		HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-}
-void start_DHT22(void){
-	GPIO_INIT_OUTPUT();
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET);
-	HAL_Delay(1);
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_SET);
-	delay_us(35);
-	GPIO_INIT_INPUT();
-}
-uint8_t DHT22_Verification_Reponse(void){
-	GPIO_INIT_INPUT();
-	uint8_t Reponse = 0;
-	delay_us(30);
-	if (!(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_3)))
-	{
-		delay_us(80);
-			if ((HAL_GPIO_ReadPin (GPIOB, GPIO_PIN_3))) Reponse=1;
-			else Reponse= -1;
-	}
-	while((HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_3))){}
-
-			return Reponse;
-
-}
-uint8_t Lecture_DHT22(void){
-	uint8_t octet_mesure,j;
-	for(j=0;j<8;j++)
-	{
-		while (!(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_3))){}
-		delay_us(40);
-		if (!(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_3)))
-		{
-			octet_mesure &= ~(1<<(7-j));
-
-		}
-		else
-		{
-			octet_mesure |= (1<<(7-j));
-		}
-		while((HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_3))){}
-	}
-	return octet_mesure;
-}
-void affichage_temperature(float Temperature){
-	char txt[20]={0};
-	sprintf(txt,"Temp:%.2f C",Temperature);
-	clearlcd();
-	lcd_position(&hi2c1,0,0);
-	lcd_print(&hi2c1,txt);
-}
-void affichage_humidite(float Humidite){
-	char txt[20]={0};
-	sprintf(txt,"Humi:%.2f ",Humidite);
-	lcd_position(&hi2c1,0,1);
-	lcd_print(&hi2c1,txt);
-}
-
-
+float Temperature, Pressure, Humidity;
 /* USER CODE END 0 */
 
 /**
@@ -150,19 +74,7 @@ void affichage_humidite(float Humidite){
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	/*void INIT_timer3(){
-		RCC->APB1ENR1 |= (1<<1);//activation du clk de TIM3
-		TIM3->PSC = 15;//prescaler du TIM3 pour avoir f=1Mhz ceci signie aussi que le timer va s'incrementer tous les microsecondes
-		TIM3->ARR = 20;// la valeur de reload du TIM3 (1Mhz /20)=50Khz, t=20us a fin de faire une temporisation de 20 us
-		TIM3->CNT = 0;//initialisation du comptage de timer
-		TIM3->CR1 |= (1<<0);//activation du TIM3 tempo=20us
-		while((TIM3->SR & (1<<0))==0){}//attente de 20us
-		if((TIM3->SR & (1<<0))==1){// test si 20us sont terminer
-		TIM3->SR &= ~(0x1); } // remise a zero du flag de temporisation
-	}*/
-
-
-
+	uint8_t buf[12];
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -185,14 +97,18 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_I2C1_Init();
-  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
-  HAL_TIM_Base_Start(&htim6);
-    clearlcd();
-    lcd_init(&hi2c1,&lcddata);
-    lcd_position(&hi2c1,1,1);
-    lcd_print(&hi2c1,"Initialisation");
-    HAL_Delay(2000);
+  int ret = BMP280_Config(OSRS_16, OSRS_16, OSRS_OFF, MODE_NORMAL, T_SB_1000, IIR_16);
+  HAL_Delay(500);
+
+  char msg[255] = "Start up\n";
+  HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 50);
+  if (ret>=0)
+	  sprintf(msg, "BMP280 Configured %d\n", (int) ret);
+  else
+	  sprintf(msg, "BMP280 Not Configured %d\n", (int) ret);
+  HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 50);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -200,22 +116,48 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+	  BMP280_Measure();
+
+	  char data[255] = "";
+	  sprintf(data, "Pressure: %2.1f Temperature: %2.1f C \n\n", (float)Pressure, (float)Temperature);
+	  HAL_UART_Transmit(&huart2, (uint8_t*)data, strlen(data), 0xFFFF);
+
+      buf[0] = CAPTEUR_CMD_MSB_press;
+	  buf[1] = CAPTEUR_CMD_LSB_press;
+	  HAL_I2C_Master_Transmit( &hi2c1, BMP_ADDR, buf, 2, HAL_MAX_DELAY);
+	  HAL_UART_Transmit(&huart2, buf, strlen((char*)buf), HAL_MAX_DELAY);
+
+
+
+	  // Affichage sur la console UART
+
+	  HAL_Delay(100);
+
+	  // Affichage sur l'écran LCD
+	  lcd_init(&hi2c1,&lcdData);
+	  lcd_position(&hi2c1, 0, 0);
+	  lcd_print(&hi2c1, "Temp : ");
+	  lcd_position(&hi2c1, 7, 0);
+	  char temperatureString[10];
+	  sprintf(temperatureString, "%2.1f", (float)Temperature,"hPa");
+	  lcd_print(&hi2c1, temperatureString);
+	  lcd_print(&hi2c1, "C");
+	  lcd_position(&hi2c1, 0, 1);
+	  lcd_print(&hi2c1, "Press: ");
+	  lcd_position(&hi2c1, 7, 1);
+	  char pressureString[10];
+	  sprintf(pressureString, "%2.1f", (float)Pressure,"°C");
+	  lcd_print(&hi2c1, pressureString);
+	  lcd_print(&hi2c1, "Pa");
+	  // Reglage couleur (100, 100, 20);
+
+	  HAL_Delay(5000);
+
+
+
+
 
     /* USER CODE BEGIN 3 */
-	  start_DHT22();
-	  Reception=DHT22_Verification_Reponse();
-	  Humidite_octet_1 = Lecture_DHT22();
-	  Humidite_octet_2 = Lecture_DHT22();
-	  Temperature_octet_1 = Lecture_DHT22();
-	  Temperature_octet_2  = Lecture_DHT22();
-	  somme = Lecture_DHT22();
-	  Temperature= (Temperature_octet_1<<8)|Temperature_octet_2;
-	  Humidite=(Humidite_octet_1<<8)|Humidite_octet_2;
-	  Temp=(float)(Temperature/10.0);
-	  Humi=(float)(Humidite/10.0);
-	  affichage_temperature(Temp);
-	  affichage_humidite(Humi);
-	  HAL_Delay(2500);
   }
   /* USER CODE END 3 */
 }
