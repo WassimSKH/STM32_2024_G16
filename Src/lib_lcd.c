@@ -21,16 +21,16 @@ void lcd_init(I2C_HandleTypeDef* I2Cx, rgb_lcd* DataStruct)
 	data[0] = 0x80;
 	data[1] = LCD_FUNCTIONSET | DataStruct->_displayfunction;
 
-	HAL_UART_Transmit(&huart2,(uint8_t *)data,2,10);
+	HAL_UART_Transmit(&huart1,(uint8_t *)data,2,10);
 	char newline[2] = "\r\n";
-	HAL_UART_Transmit(&huart2, (uint8_t *) newline, 2, 10);
+	HAL_UART_Transmit(&huart1, (uint8_t *) newline, 2, 10);
 
 	HAL_StatusTypeDef status = HAL_I2C_IsDeviceReady(Handle,LCD_ADDRESS,5,100);
-	HAL_UART_Transmit(&huart2,&status,1,10);
+	HAL_UART_Transmit(&huart1,&status,1,10);
 	HAL_Delay(50);
 
 	HAL_StatusTypeDef status2 = HAL_I2C_Master_Transmit(Handle, LCD_ADDRESS, data,2,5000);
-	HAL_UART_Transmit(&huart2,&status2,1,10);
+	HAL_UART_Transmit(&huart1,&status2,1,10);
 	HAL_Delay(50);
 
 	HAL_I2C_Master_Transmit(Handle,LCD_ADDRESS,data,2,5000);

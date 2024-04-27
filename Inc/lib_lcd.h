@@ -30,8 +30,8 @@
   THE SOFTWARE.1  USA
 */
 
-#include "stm32l4xx_hal.h"
-#include "stm32l4xx_hal_i2c.h"
+#include "stm32wbxx_hal.h"
+#include "stm32wbxx_hal_i2c.h"
 
 // Device I2C Adress
 #define LCD_ADDRESS     0x7c
